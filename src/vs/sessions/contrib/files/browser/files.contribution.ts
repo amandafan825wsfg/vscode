@@ -17,6 +17,7 @@ import { WorkspaceFolderCountContext } from '../../../../workbench/common/contex
 import { ExplorerView } from '../../../../workbench/contrib/files/browser/views/explorerView.js';
 import { ViewPaneContainer } from '../../../../workbench/browser/parts/views/viewPaneContainer.js';
 import { IViewsService } from '../../../../workbench/services/views/common/viewsService.js';
+import { IsMobileLayoutContext } from '../../../common/contextkeys.js';
 
 const SESSIONS_FILES_CONTAINER_ID = 'workbench.sessions.auxiliaryBar.filesContainer';
 const SESSIONS_FILES_VIEW_ID = 'sessions.files.explorer';
@@ -51,7 +52,7 @@ class RegisterFilesViewContribution implements IWorkbenchContribution {
 			ctorDescriptor: new SyncDescriptor(ExplorerView),
 			canToggleVisibility: true,
 			canMoveView: false,
-			when: WorkspaceFolderCountContext.notEqualsTo('0'),
+			when: ContextKeyExpr.and(WorkspaceFolderCountContext.notEqualsTo('0'), IsMobileLayoutContext.negate()),
 			windowVisibility: WindowVisibility.Sessions,
 		}], filesViewContainer);
 	}
