@@ -15,20 +15,31 @@ import { NextEditResult } from './nextEditResult';
  * log context so each cancellation has an attributable cause.
  */
 export const enum SpeculativeCancelReason {
+
 	/** The originating suggestion was rejected by the user. */
 	Rejected = 'rejected',
+
 	/** The originating suggestion was dismissed without being superseded. */
 	IgnoredDismissed = 'ignoredDismissed',
+
 	/** A new fetch is starting whose `(docId, postEditContent)` doesn't match. */
 	Superseded = 'superseded',
+
 	/** A newer speculative is being installed in this slot. */
 	Replaced = 'replaced',
+
 	/** The user's edits moved off the type-through trajectory toward `postEditContent`. */
-	DivergedFromTrajectory = 'divergedFromTrajectory',
-	/** `clearCache()` was invoked — the result has nowhere meaningful to land. */
+	DivergedFromTrajectoryForm = 'divergedFromTrajectoryForm',
+	DivergedFromTrajectoryPrefix = 'divergedFromTrajectoryPrefix',
+	DivergedFromTrajectoryMiddle = 'divergedFromTrajectoryMiddle',
+	DivergedFromTrajectorySuffix = 'divergedFromTrajectorySuffix',
+
+	/** `clearCache()` was invoked. */
 	CacheCleared = 'cacheCleared',
+
 	/** The target document was removed from the workspace. */
 	DocumentClosed = 'documentClosed',
+
 	/** The provider was disposed. */
 	Disposed = 'disposed',
 }
@@ -147,16 +158,20 @@ export class SpeculativeRequestManager extends Disposable {
 		}
 		// Cheap structural failure: doc shorter than the unedited frame.
 		if (currentDocValue.length < p.trajectoryPrefix.length + p.trajectorySuffix.length) {
-			this._cancelPending(SpeculativeCancelReason.DivergedFromTrajectory);
+			this._cancelPending(SpeculativeCancelReason.DivergedFromTrajectoryForm);
 			return;
 		}
-		if (!currentDocValue.startsWith(p.trajectoryPrefix) || !currentDocValue.endsWith(p.trajectorySuffix)) {
-			this._cancelPending(SpeculativeCancelReason.DivergedFromTrajectory);
+		if (!currentDocValue.startsWith(p.trajectoryPrefix)) {
+			this._cancelPending(SpeculativeCancelReason.DivergedFromTrajectoryPrefix);
+			return;
+		}
+		if (!currentDocValue.endsWith(p.trajectorySuffix)) {
+			this._cancelPending(SpeculativeCancelReason.DivergedFromTrajectorySuffix);
 			return;
 		}
 		const middle = currentDocValue.slice(p.trajectoryPrefix.length, currentDocValue.length - p.trajectorySuffix.length);
 		if (!p.trajectoryNewText.startsWith(middle)) {
-			this._cancelPending(SpeculativeCancelReason.DivergedFromTrajectory);
+			this._cancelPending(SpeculativeCancelReason.DivergedFromTrajectoryMiddle);
 		}
 	}
 

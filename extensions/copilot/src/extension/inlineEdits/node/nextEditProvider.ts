@@ -224,20 +224,33 @@ export class NextEditProvider extends Disposable implements INextEditProvider<Ne
 		}).recomputeInitiallyAndOnChange(this._store);
 	}
 
+	/**
+	 * Cancels the in-flight stateless next-edit request when the document it
+	 * was issued for has diverged from the request's expected post-edit state.
+	 *
+	 * Invoked from the per-document `runOnChange` autorun in the constructor
+	 * whenever an open document's value changes. The pending request was built
+	 * against a specific snapshot (`documentAfterEdits`); if the user has since
+	 * typed something that makes the current value differ from that snapshot,
+	 * the result would no longer be applicable and is cancelled eagerly.
+	 *
+	 * Skipped when:
+	 * - the `InlineEditsAsyncCompletions` experiment is enabled (that path
+	 *   tolerates divergence and rebases later), or
+	 * - there is no pending request, or
+	 * - the changed document is not the one the pending request targets.
+	 *
+	 * Note: this only handles the regular pending stateless request. Speculative
+	 * requests have their own divergence handling via
+	 * `SpeculativeRequestManager.onActiveDocumentChanged` (trajectory check).
+	 */
 	private _cancelPendingRequestDueToDocChange(docId: DocumentId, docValue: StringText) {
-		// Speculative requests are handled by `_specManager.onActiveDocumentChanged`,
-		// which uses a trajectory check (the user's typing must remain a type-through
-		// prefix toward the speculative's `postEditContent`) to decide whether to
-		// cancel. That handles the common type-through case (e.g. typing `i` while a
-		// suggestion of `ibonacci` is shown) without losing the speculative.
-		// This method only deals with the regular pending request, which is keyed on
-		// the *pre-edit* state and must be cancelled whenever the active document
-		// diverges from it.
-
 		const isAsyncCompletions = this._configService.getExperimentBasedConfig(ConfigKey.TeamInternal.InlineEditsAsyncCompletions, this._expService);
+
 		if (isAsyncCompletions || this._pendingStatelessNextEditRequest === null) {
 			return;
 		}
+
 		const activeDoc = this._pendingStatelessNextEditRequest.getActiveDocument();
 		if (activeDoc.id === docId && activeDoc.documentAfterEdits.value !== docValue.value) {
 			this._pendingStatelessNextEditRequest.cancellationTokenSource.cancel();
@@ -1103,8 +1116,11 @@ export class NextEditProvider extends Disposable implements INextEditProvider<Ne
 			return;
 		}
 
-		// Cancel any previous speculative request — we are about to install a new one.
-		this._specManager.cancelAll(SpeculativeCancelReason.Replaced);
+		// Note: any previous speculative request will be cancelled (as `Replaced`)
+		// by `_specManager.setPending` once the new request is actually installed —
+		// see the `setPending` call at the end of this method. We deliberately do
+		// not cancel earlier so the prior speculative stays available for reuse
+		// while the new one is being constructed.
 
 		const historyContext = this._historyContextProvider.getHistoryContext(docId);
 		if (!historyContext) {
