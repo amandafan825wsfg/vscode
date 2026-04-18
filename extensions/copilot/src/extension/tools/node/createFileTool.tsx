@@ -88,8 +88,10 @@ export class CreateFileTool implements ICopilotTool<ICreateFileParams> {
 			// ignored
 		}
 
-		// note: fileExists could be `false` but we might still get a `doc` if it's held in memory
-		if (fileExists && !!doc?.getText()) {
+		// note: fileExists could be `false` but we might still get a `doc` if it's held in memory.
+		// Reject in either case so we never prepend new content onto a stale in-memory buffer
+		// (see https://github.com/microsoft/vscode/issues/311043).
+		if (fileExists || !!doc?.getText()) {
 			if (hasSupportedNotebooks) {
 				throw new Error(`File already exists. You must use the ${ToolName.EditNotebook} tool to modify it.`);
 			} else {
